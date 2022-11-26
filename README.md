@@ -1,0 +1,1 @@
+# munin-host-cyght
