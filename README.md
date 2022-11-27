@@ -9,3 +9,4 @@ optional arguments:
   -f path        File to process (IP adress line by line
   -i IP address  Single IP adress
  ```
+The limit.txt file need to be only with '0' for the first run
