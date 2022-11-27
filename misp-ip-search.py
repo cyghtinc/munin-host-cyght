@@ -1,30 +1,16 @@
 import ipaddress
+import os
 import re
 import requests
 import pymisp #pip install pymisp
 import time
 import csv
+import argparse
+
 
 misp_url = 'https://misppriv.circl.lu'
 misp_key = 'Ev0eihJb8VasYZXTLy5Oc5uhHesUIv9CKqxmAN3f'
 misp_verifycert = False
-
-# #PyMISP(m_url, m_auth_key, args.verifycert, debug=args.debug, proxies={},cert=None,auth=None,tool='Munin : Online hash checker')
-# misp = PyMISP(misp_url,misp_key,misp_verifycert,debug=False,proxies={},cert=None,auth=None,tool='Cyght:  Online IP checker')
-# counter = 0
-# f = open("./combined-unique.txt", "r")
-# lines = f.readlines()
-# for line in lines:
-#     complex_query = misp.build_complex_query(or_parameters=[line])
-#     events = misp.search(value=complex_query,pythonify=True)
-#     counter += 1
-# #    print (events)
-#     if len(events) != 0:
-#         print(line)
-#     for e in events:
-#         print (e)
-#     if counter % 4 == 0:
-#         time.sleep(60)
 
 def is_ip(value):
     ip_pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b$'
@@ -76,43 +62,104 @@ def render_results(result_object, indicator, attribute_types):
     return(output)
 
 def misp_search_ip(ip):
+    update_limit()
     requests.packages.urllib3.disable_warnings()  # I don't care
     attribute_types = ["ip-src","ip-dst"]
     misp = pymisp.PyMISP(misp_url, misp_key, False, False, proxies={},cert=None,auth=None,tool='Cyght : Online ip checker')
     result = misp.search(value=ip, type_attribute= ["ip-src","ip-dst"], limit=11, published=True, to_ids=True, deleted=False, pythonify=True)          
     return(render_results(result, ip, attribute_types))
 
-f = open("./combined-unique.txt", "r")
-limit_counter = 1
-lines = f.readlines()
+def read_limit():
+    limit_file = open('./limit.txt', "r")
+    limit = int(limit_file.readline().strip())
+    limit_file.close()
+    return limit
 
-with open('results.csv', 'a', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(["IP", "Private", "Found On","Error"])
+def update_limit():
+    limit = read_limit()
+    limit_file = open('./limit.txt', "w")
+    if limit == 15:
+        update = 0
+    else:
+        update = limit+1
+    limit_file.write(str(update))
+    limit_file.close()
+    return update
 
-for line in lines:
-    with open('results.csv', 'a', newline='') as file:
+# Initialize parser
+parser = argparse.ArgumentParser(description='MISP Online IP Checker (Limit Of 15 IP Addresses Per 15 Minutes)')
+ 
+# Adding optional argument
+parser.add_argument("-f", help = 'File to process (IP adress line by line', metavar='path',default='')
+parser.add_argument("-i", help = 'Single IP adress', metavar='IP address',default='')
+
+# Read arguments from command line
+args = parser.parse_args()
+ 
+# Check args
+if args.f != '' and args.i !='':
+    print("[E] Please provide only an input file with '-f' input file or a single ip address with '-i' ip address\n")
+    parser.print_help()
+    exit(1)
+if args.f == '' and args.i =='':
+    print("[E] Please provide an input file with '-f' input file or a single ip address with '-i' ip address\n")
+    parser.print_help()
+    exit(1)
+if args.f != '' and not os.path.exists(args.f):
+    print("[E] Cannot find input file {0}".format(args.f) + ", please Enter the full path")
+    exit(1)
+if args.f != '' and not args.f.__contains__('.txt'):
+    print("[E] Please provide a txt File")
+    exit(1)
+
+# Scan input file
+if args.f != '':
+    f = open(args.f, "r")
+    lines = f.readlines()
+
+    with open('results.csv', 'a', newline='') as file: 
         writer = csv.writer(file)
-        ip = line.strip()
-        if not is_ip:
-            writer.writerow([ip,"" , "","Not a valid IP"])
-            continue
-        if is_private(ip):
-            writer.writerow([ip,"True" , "",""])
-            continue
-        if limit_counter == 16:
-            limit_counter = 1
-            print('sleeping')
-            time.sleep(900)
-            print('wake up')
-            
-        info = misp_search_ip(line.strip())
-        if info == "*Error parsing MISP results*\n":
-            writer.writerow([ip,"False" , "",info.strip()])
-        elif info == "No results found\n":
-            writer.writerow([ip,"False" , "",""])
-        else:
-            writer.writerow([ip,"False", info,""])
-        print('counter: ' +str(limit_counter)+'\n')
-        limit_counter += 1
-f.close()
+        writer.writerow(["IP", "Private", "Found On","Error"]) #prepare titles for the csv file
+    for line in lines:
+        with open('results.csv', 'a', newline='') as file:
+            writer = csv.writer(file)
+            ip = line.strip()
+            if not is_ip:
+                writer.writerow([ip,"" , "","Not a valid IP"])
+                continue
+            if is_private(ip):
+                writer.writerow([ip,"True" , "",""])
+                continue
+            if read_limit() == 15: #we have a limit of 15 req for 15 min
+                print('We have reached the Limit, sleeping for 15 minutes (please dont exit)...')
+                time.sleep(900)
+                print('Wake up..')
+                
+            info = misp_search_ip(line.strip())
+            if info == "*Error parsing MISP results*\n":
+                writer.writerow([ip,"False" , "",info.strip()])
+            elif info == "No results found\n":
+                writer.writerow([ip,"False" , "",""])
+            else:
+                writer.writerow([ip,"False", info,""])
+            print('Requests sent (for valid and non-private addresses) in the current limit: ' +str(read_limit())+'\n')
+    f.close()
+    print('End of Scan..')
+    exit(0)
+
+# Case that the single IP address is not a valid IP address
+if not is_ip(args.i):
+    print("[E] Please a valid IP address")
+    exit(1)
+
+# Case that the single IP address is private
+if not is_private(args.i):
+    print(args.i + 'is a private address.')
+    exit(0)
+# Check only a single IP address
+if read_limit() == 15:
+    print('We have reached the Limit, sleeping for 15 minutes (please dont exit)...')
+    time.sleep(900)
+    print('Wake up..')
+info = misp_search_ip(args.i)
+print(info)
