@@ -3,6 +3,7 @@ import re
 import requests
 import pymisp #pip install pymisp
 import time
+import csv
 
 misp_url = 'https://misppriv.circl.lu'
 misp_key = 'Ev0eihJb8VasYZXTLy5Oc5uhHesUIv9CKqxmAN3f'
@@ -85,25 +86,33 @@ f = open("./combined-unique.txt", "r")
 limit_counter = 1
 lines = f.readlines()
 
-for line in lines:
-    fw = open("results.txt", "a")
-    ip = line.strip()
-    if not is_ip:
-        fw.write(ip + ' is not valid ip\n')
-        continue
-    if is_private(ip):
-        fw.write(ip + ' is private\n')
-        continue
-    if limit_counter == 16:
-        limit_counter = 1
-        print('sleeping')
-        time.sleep(900)
-        print('wake up')
-        
-    info = misp_search_ip(line.strip())
-    fw.write('ip '+line.strip()+' results: \n'+info)
-    print('counter: ' +str(limit_counter)+'\n')
-    limit_counter += 1
-    fw.close()
+with open('results.csv', 'a', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(["IP", "Private", "Found On","Error"])
 
+for line in lines:
+    with open('results.csv', 'a', newline='') as file:
+        writer = csv.writer(file)
+        ip = line.strip()
+        if not is_ip:
+            writer.writerow([ip,"" , "","Not a valid IP"])
+            continue
+        if is_private(ip):
+            writer.writerow([ip,"True" , "",""])
+            continue
+        if limit_counter == 16:
+            limit_counter = 1
+            print('sleeping')
+            time.sleep(900)
+            print('wake up')
+            
+        info = misp_search_ip(line.strip())
+        if info == "*Error parsing MISP results*\n":
+            writer.writerow([ip,"False" , "",info.strip()])
+        elif info == "No results found\n":
+            writer.writerow([ip,"False" , "",""])
+        else:
+            writer.writerow([ip,"False", info,""])
+        print('counter: ' +str(limit_counter)+'\n')
+        limit_counter += 1
 f.close()
