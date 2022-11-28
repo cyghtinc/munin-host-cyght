@@ -1,1 +1,5 @@
 venv
+.vscode
+limit.txt
+combinded-unique.txt
+results.csv
