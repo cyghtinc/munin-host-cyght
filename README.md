@@ -1,4 +1,7 @@
 # munin-host-cyght
+## What is munin-host-cyght?
+
+munin-host-cyght is a online IP checker utility that retrieves valuable information from MISP
 
 ## Usage
 
