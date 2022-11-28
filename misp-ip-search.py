@@ -3,7 +3,7 @@ import ipaddress
 import os
 import re
 import requests
-import pymisp #pip install pymisp
+import pymisp
 import time
 import csv
 import argparse
