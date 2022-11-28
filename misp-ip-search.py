@@ -116,21 +116,17 @@ args = parser.parse_args()
 # Check args
 if args.f != '' and args.i !='':
     print("[E] Please provide only an input file with '-f' input file or a single ip address with '-i' ip address\n")
-    input('Press any key to exit\n')
     parser.print_help()
     exit(1)
 if args.f == '' and args.i =='':
     print("[E] Please provide an input file with '-f' input file or a single ip address with '-i' ip address\n")
-    input('Press any key to exit\n')
     parser.print_help()
     exit(1)
 if args.f != '' and not os.path.exists(args.f):
     print("[E] Cannot find input file {0}".format(args.f) + ", please Enter the full path")
-    input('Press any key to exit\n')
     exit(1)
 if args.f != '' and not args.f.__contains__('.txt'):
     print("[E] Please provide a txt File")
-    input('Press any key to exit\n')
     exit(1)
 
 # Scan input file
@@ -165,20 +161,17 @@ if args.f != '':
                 writer.writerow([ip,"False", info,""])
             print('Requests sent (for valid and non-private addresses) in the current limit: ' +str(read_limit())+'\n')
     f.close()
-    print('End of Scan..')
-    input('Press any key to exit')
+    print('End of Scan, the results are waiting at ./results.csv')
     exit(0)
 
 # Case that the single IP address is not a valid IP address
 if not is_ip(args.i):
     print("[E] Please a valid IP address")
-    input('Press any key to exit\n')
     exit(1)
 
 # Case that the single IP address is private
 if not is_private(args.i):
     print(args.i + 'is a private address.')
-    input('Press any key to exit\n')
     exit(0)
 # Check only a single IP address
 if read_limit() == 15:
@@ -187,5 +180,5 @@ if read_limit() == 15:
     print('Wake up..')
 info = misp_search_ip(args.i)
 print(info)
-input('Press any key to exit\n')
+
 
